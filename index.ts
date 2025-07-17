@@ -4,7 +4,6 @@ import mongoose from "mongoose"
 import { authRouter } from "./routes/authRoutes"
 import { globalErrorHandler } from "./middlewares/errorMiddleware"
 import cors from "cors"
-import http from 'http'
 import cookieParser from "cookie-parser"
 import { balanceRouter } from "./routes/balanceRoutes"
 import transactionRouter from "./routes/transactionalRoutes"
@@ -13,14 +12,17 @@ import { initializeTransactionSystem } from "./controllers/transactionController
 import serverless from "serverless-http"
 const app = express()
 
+
 const wss = createWebSocketServer()
 
-
 const corsOptions = {
-  origin: ['https://statescoinp2p.netlify.app',"http://localhost:5173"],
-  credentials: true, // Allow credentials (cookies)
-  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
+  origin: 'https://statescoinp2p.netlify.app',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 };
+
+app.options('*', cors(corsOptions));
 
 app.use(cors(corsOptions))
 app.use(cookieParser())

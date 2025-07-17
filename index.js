@@ -26,12 +26,18 @@ const transactionControllers_1 = require("./controllers/transactionControllers")
 const app = (0, express_1.default)();
 const wss = (0, webSockets_1.createWebSocketServer)();
 const corsOptions = {
-    origin: ['https://statescoinp2p.netlify.app', "http://localhost:5173"],
-    credentials: true, // Allow credentials (cookies)
-    optionsSuccessStatus: 200 // Some legacy browsers choke on 204
+    origin: 'https://statescoinp2p.netlify.app',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 };
+app.options('*', (0, cors_1.default)(corsOptions));
 app.use((0, cors_1.default)(corsOptions));
 app.use((0, cookie_parser_1.default)());
+const router = express_1.default.Router();
+router.get('/', (req, res) => {
+    res.send('Welcome to StatesCoin P2P API');
+});
 app.use(express_1.default.json());
 app.use("/api/v1", authRoutes_1.authRouter);
 app.use("/api/v1", balanceRoutes_1.balanceRouter);
