@@ -1,9 +1,10 @@
-import { Server } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { User } from "./model/userModel";
 import axios from "axios";
 import { URL } from 'url';
 import { EventEmitter } from 'events';
+
+
 
 interface Balance {
     available: number;
@@ -14,6 +15,7 @@ interface UserBalances {
     [key: string]: Balance;
 }
 import eventBus from './Utils/eventBus';
+import { Server } from 'http';
 
 interface PriceData {
     [key: string]: {
@@ -178,79 +180,114 @@ const setupDatabaseChangeListeners = () => {
     }
 };
 
-export const createWebSocketServer = () => {
-    const wss = new WebSocketServer({ port: 8080 });
+export const createWebSocketServer = (server: Server) => {
+    console.log('[WebSocket] Initializing WebSocket server...');
+    const wss = new WebSocketServer({ server });
 
-    // Setup database change listeners
+    console.log('[WebSocket] Setting up database change listeners...');
     setupDatabaseChangeListeners();
 
     // Event listeners for balance and price changes
     balanceUpdateEmitter.on('balances_changed', (userId) => {
+        console.log(`[WebSocket] balances_changed event received for user ${userId}`);
         updateUserClients(userId);
     });
 
     balanceUpdateEmitter.on('prices_updated', () => {
+        console.log('[WebSocket] prices_updated event received');
         // Update all clients when prices change
         connectedClients.forEach((_, userId) => {
+            console.log(`[WebSocket] Updating client for user ${userId} due to price change`);
             updateUserClients(userId);
         });
     });
 
     // Regular price refresh (every 2 minutes)
     const priceRefreshInterval = setInterval(() => {
+        console.log('[WebSocket] Running scheduled price refresh...');
         const coinIds = Array.from(new Set(
             Object.values(symbolToIdMap).filter(Boolean)
         ));
         if (coinIds.length) {
-            fetchPricesFromCoinGecko(coinIds).catch(console.error);
+            fetchPricesFromCoinGecko(coinIds)
+                .then(() => console.log('[WebSocket] Price refresh completed successfully'))
+                .catch(err => console.error('[WebSocket] Price refresh failed:', err));
         }
     }, CACHE_DURATION);
 
     wss.on('connection', (ws: WebSocket, req) => {
+        const clientIp = req.socket.remoteAddress;
+        console.log(`[WebSocket] New connection from ${clientIp}`);
+
         try {
             const url = new URL(req.url || '', `http://${req.headers.host}`);
             const userId = url.searchParams.get('userId');
 
             if (!userId) {
+                console.log('[WebSocket] Connection rejected - missing userId');
                 sendError(ws, "User ID is required");
                 return ws.close();
             }
 
+            console.log(`[WebSocket] User ${userId} connected`);
+
             // Add to connected clients
             if (!connectedClients.has(userId)) {
+                console.log(`[WebSocket] First connection for user ${userId}`);
                 connectedClients.set(userId, []);
             }
             connectedClients.get(userId)?.push(ws);
+
+            console.log(`[WebSocket] Currently connected clients: ${Array.from(connectedClients.keys()).join(', ')}`);
 
             // Send initial data
             updateUserClients(userId);
 
             // Clean up on close
             ws.on('close', () => {
+                console.log(`[WebSocket] User ${userId} disconnected`);
                 const userClients = connectedClients.get(userId) || [];
                 connectedClients.set(userId, userClients.filter(client => client !== ws));
                 if (connectedClients.get(userId)?.length === 0) {
+                    console.log(`[WebSocket] No more connections for user ${userId}`);
                     connectedClients.delete(userId);
                 }
+                console.log(`[WebSocket] Remaining clients: ${Array.from(connectedClients.keys()).join(', ')}`);
             });
 
             ws.on('error', (error) => {
-                console.error(`WebSocket error for user ${userId}:`, error);
+                console.error(`[WebSocket] Error for user ${userId}:`, error);
+            });
+
+            ws.on('pong', () => {
+                console.log(`[WebSocket] Received pong from user ${userId}`);
             });
 
         } catch (error) {
-            console.error("Connection setup error:", error);
+            console.error("[WebSocket] Connection setup error:", error);
             sendError(ws, "Internal server error");
             ws.close();
         }
     });
 
+    // Health check ping
+    const pingInterval = setInterval(() => {
+        wss.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.ping();
+                console.log('[WebSocket] Sent ping to client');
+            }
+        });
+    }, 30000); // Every 30 seconds
+
     // Cleanup on server close
     wss.on('close', () => {
+        console.log('[WebSocket] Server shutting down...');
         clearInterval(priceRefreshInterval);
+        clearInterval(pingInterval);
         connectedClients.clear();
     });
 
-    console.log('WebSocket server created');
+    console.log('[WebSocket] Server successfully created and ready for connections');
     return wss;
 };

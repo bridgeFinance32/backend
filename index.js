@@ -21,10 +21,11 @@ const cors_1 = __importDefault(require("cors"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const balanceRoutes_1 = require("./routes/balanceRoutes");
 const transactionalRoutes_1 = __importDefault(require("./routes/transactionalRoutes"));
+const http_1 = require("http");
 const webSockets_1 = require("./webSockets");
 const transactionControllers_1 = require("./controllers/transactionControllers");
 const app = (0, express_1.default)();
-const wss = (0, webSockets_1.createWebSocketServer)();
+const server = (0, http_1.createServer)(app); // Create HTTP server from Express app
 const corsOptions = {
     origin: 'https://statescoinp2p.netlify.app',
     credentials: true,
@@ -34,15 +35,13 @@ const corsOptions = {
 app.options('*', (0, cors_1.default)(corsOptions));
 app.use((0, cors_1.default)(corsOptions));
 app.use((0, cookie_parser_1.default)());
-const router = express_1.default.Router();
-router.get('/', (req, res) => {
-    res.send('Welcome to StatesCoin P2P API');
-});
 app.use(express_1.default.json());
 app.use("/api/v1", authRoutes_1.authRouter);
 app.use("/api/v1", balanceRoutes_1.balanceRouter);
 app.use('/api/v1', transactionalRoutes_1.default);
 app.use(errorMiddleware_1.globalErrorHandler);
+// Create WebSocket server by passing the HTTP server
+const wss = (0, webSockets_1.createWebSocketServer)(server);
 function startServer() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -55,8 +54,9 @@ function startServer() {
             // 2. Initialize transaction system
             yield (0, transactionControllers_1.initializeTransactionSystem)();
             // 3. Start the server
-            app.listen(config_1.default.NODE_PORT, () => {
+            server.listen(config_1.default.NODE_PORT, () => {
                 console.log(`Server running on port ${config_1.default.NODE_PORT}`);
+                console.log(`WebSocket server running on the same port`);
                 // Enable Mongoose debug in development
                 if (process.env.NODE_ENV === 'development') {
                     mongoose_1.default.set('debug', true);

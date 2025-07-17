@@ -7,13 +7,13 @@ import cors from "cors"
 import cookieParser from "cookie-parser"
 import { balanceRouter } from "./routes/balanceRoutes"
 import transactionRouter from "./routes/transactionalRoutes"
+import { createServer } from 'http'
 import { createWebSocketServer } from "./webSockets"
 import { initializeTransactionSystem } from "./controllers/transactionControllers"
 import serverless from "serverless-http"
+
 const app = express()
-
-
-const wss = createWebSocketServer()
+const server = createServer(app) // Create HTTP server from Express app
 
 const corsOptions = {
   origin: 'https://statescoinp2p.netlify.app',
@@ -23,22 +23,18 @@ const corsOptions = {
 };
 
 app.options('*', cors(corsOptions));
-
 app.use(cors(corsOptions))
 app.use(cookieParser())
 
-const router = express.Router();
-router.get('/', (req, res)=>{
-  res.send('Welcome to StatesCoin P2P API');
-})
 
 app.use(express.json())
 app.use("/api/v1",authRouter)
 app.use("/api/v1", balanceRouter)
 app.use('/api/v1', transactionRouter)
-
 app.use(globalErrorHandler)
 
+// Create WebSocket server by passing the HTTP server
+const wss = createWebSocketServer(server)
 
 async function startServer() {
   try {
@@ -53,8 +49,9 @@ async function startServer() {
     await initializeTransactionSystem();
 
     // 3. Start the server
-    app.listen(Config.NODE_PORT, () => {
+    server.listen(Config.NODE_PORT, () => {
       console.log(`Server running on port ${Config.NODE_PORT}`);
+      console.log(`WebSocket server running on the same port`);
       
       // Enable Mongoose debug in development
       if (process.env.NODE_ENV === 'development') {
@@ -91,5 +88,3 @@ process.on('SIGINT', async () => {
   await mongoose.disconnect();
   process.exit(0);
 });
-
-
