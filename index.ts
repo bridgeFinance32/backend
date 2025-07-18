@@ -70,15 +70,3 @@ async function startServer() {
 // Start the server
 startServer();
 
-// Handle process termination
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
-  await mongoose.disconnect();
-  process.exit(0);
-});
-
-process.on('SIGINT', async () => {
-  console.log('SIGINT received. Shutting down gracefully...');
-  await mongoose.disconnect();
-  process.exit(0);
-});

@@ -71,14 +71,3 @@ function startServer() {
 }
 // Start the server
 startServer();
-// Handle process termination
-process.on('SIGTERM', () => __awaiter(void 0, void 0, void 0, function* () {
-    console.log('SIGTERM received. Shutting down gracefully...');
-    yield mongoose_1.default.disconnect();
-    process.exit(0);
-}));
-process.on('SIGINT', () => __awaiter(void 0, void 0, void 0, function* () {
-    console.log('SIGINT received. Shutting down gracefully...');
-    yield mongoose_1.default.disconnect();
-    process.exit(0);
-}));
