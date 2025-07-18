@@ -30,6 +30,7 @@ app.use("/api/v1", balanceRouter)
 app.use('/api/v1', transactionRouter)
 
 app.use(globalErrorHandler)
+app.set("trust proxy", 1);
 
 
 async function startServer() {

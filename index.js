@@ -37,6 +37,7 @@ app.use("/api/v1", authRoutes_1.authRouter);
 app.use("/api/v1", balanceRoutes_1.balanceRouter);
 app.use('/api/v1', transactionalRoutes_1.default);
 app.use(errorMiddleware_1.globalErrorHandler);
+app.set("trust proxy", 1);
 function startServer() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
