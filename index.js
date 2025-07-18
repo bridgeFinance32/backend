@@ -24,7 +24,7 @@ const transactionalRoutes_1 = __importDefault(require("./routes/transactionalRou
 const transactionControllers_1 = require("./controllers/transactionControllers");
 const app = (0, express_1.default)();
 const corsOptions = {
-    origin: ['https://statescoinp2p.netlify.app, http://localhost:5173'], // Your frontend origin
+    origin: ['https://statescoinp2p.netlify.app', 'http://localhost:5173'], // Your frontend origin
     credentials: true, // Allow credentials (cookies)
     optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 };
