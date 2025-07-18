@@ -134,6 +134,8 @@ const userSchema = new mongoose_1.Schema({
         transform: (doc, ret) => {
             delete ret.password;
             delete ret.__v;
+            delete ret._id; // Optional: remove if you want to keep _id
+            ret.id = doc._id.toString(); // Cast _id to string
             return ret;
         },
     },
@@ -142,6 +144,8 @@ const userSchema = new mongoose_1.Schema({
         transform: (doc, ret) => {
             delete ret.password;
             delete ret.__v;
+            delete ret._id; // Optional: remove if you want to keep _id
+            ret.id = doc._id.toString(); // Cast _id to string
             return ret;
         },
     },
@@ -174,31 +178,22 @@ userSchema.methods.isValidPassword = function (candidatePassword) {
         }
     });
 };
-// ======================
-// OPTIMIZED INDEXES
-// ======================
-// Basic indexes
+// Indexes
 userSchema.index({ email: 1 }, { unique: true });
 userSchema.index({ username: 1 }, { unique: true });
-// Query optimization indexes
-userSchema.index({ role: 1 }); // For role-based queries
-userSchema.index({ isVerified: 1 }); // For verification status checks
-userSchema.index({ isBanned: 1 }); // For ban status checks
-userSchema.index({ lastLogin: -1 }); // For recent activity sorting
-// Compound indexes for common query patterns
+userSchema.index({ role: 1 });
+userSchema.index({ isVerified: 1 });
+userSchema.index({ isBanned: 1 });
+userSchema.index({ lastLogin: -1 });
 userSchema.index({
     role: 1,
     isVerified: 1,
     isBanned: 1
-}); // For admin dashboard queries
-userSchema.index({
-    "balances.btc.available": 1
-}); // For BTC balance queries
-userSchema.index({
-    "balances.eth.available": 1
-}); // For ETH balance queries
+});
+userSchema.index({ "balances.btc.available": 1 });
+userSchema.index({ "balances.eth.available": 1 });
 userSchema.index({
     "balances.usdt.available": 1,
     "balances.usdc.available": 1
-}); // For stablecoin queries
+});
 exports.User = mongoose_1.default.model("User", userSchema);

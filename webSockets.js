@@ -128,9 +128,9 @@ const updateUserClients = (userId) => __awaiter(void 0, void 0, void 0, function
     }
 });
 // Main WebSocket server creation
-const createWebSocketServer = (server) => {
+const createWebSocketServer = () => {
     console.log('[WebSocket] Initializing server...');
-    const wss = new ws_1.WebSocketServer({ noServer: true });
+    const wss = new ws_1.WebSocketServer({ port: 8080 });
     // Setup event listeners
     balanceUpdateEmitter.on('balances_changed', updateUserClients);
     balanceUpdateEmitter.on('prices_updated', () => {

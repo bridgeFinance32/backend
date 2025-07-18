@@ -145,6 +145,8 @@ const transactionSchema = new mongoose_1.Schema({
         virtuals: true,
         transform: (doc, ret) => {
             delete ret.__v;
+            // You can add other fields to remove here
+            // delete ret._id; 
             return ret;
         }
     }

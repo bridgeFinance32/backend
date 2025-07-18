@@ -126,11 +126,13 @@ const transactionSchema = new Schema<ITransaction, ITransactionModel>(
     finalizedAt: { type: Date }
   },
   { 
-    timestamps: true,
+     timestamps: true,
     toJSON: { 
       virtuals: true, 
-      transform: (doc, ret) => { 
-        delete ret.__v; 
+      transform: (doc: Document, ret: Record<string, any>) => { 
+        delete ret.__v;
+        // You can add other fields to remove here
+        // delete ret._id; 
         return ret; 
       } 
     }

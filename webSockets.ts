@@ -145,9 +145,9 @@ const updateUserClients = async (userId: string) => {
 };
 
 // Main WebSocket server creation
-export const createWebSocketServer = (server: Server) => {
+export const createWebSocketServer = () => {
     console.log('[WebSocket] Initializing server...');
-    const wss = new WebSocketServer({ noServer: true });
+    const wss = new WebSocketServer({port: 8080});
 
     // Setup event listeners
     balanceUpdateEmitter.on('balances_changed', updateUserClients);
