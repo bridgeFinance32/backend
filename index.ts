@@ -12,8 +12,6 @@ import { createWebSocketServer } from "./webSockets"
 import { initializeTransactionSystem } from "./controllers/transactionControllers"
 const app = express()
 
-const wss = createWebSocketServer()
-
 
 const corsOptions = {
   origin: 'https://statescoinp2p.netlify.app', // Your frontend origin
