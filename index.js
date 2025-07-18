@@ -21,12 +21,10 @@ const cors_1 = __importDefault(require("cors"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const balanceRoutes_1 = require("./routes/balanceRoutes");
 const transactionalRoutes_1 = __importDefault(require("./routes/transactionalRoutes"));
-const webSockets_1 = require("./webSockets");
 const transactionControllers_1 = require("./controllers/transactionControllers");
 const app = (0, express_1.default)();
-const wss = (0, webSockets_1.createWebSocketServer)();
 const corsOptions = {
-    origin: 'https://statescoinp2p.netlify.app', // Your frontend origin
+    origin: ['https://statescoinp2p.netlify.app, http://localhost:5173'], // Your frontend origin
     credentials: true, // Allow credentials (cookies)
     optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 };
