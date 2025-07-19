@@ -104,3 +104,5 @@ export const accountController = async (
     next(err);
   }
 };
+
+const sseClients = new Map<string, Response>();

@@ -10,6 +10,7 @@ import { balanceRouter } from "./routes/balanceRoutes"
 import transactionRouter from "./routes/transactionalRoutes"
 import { createWebSocketServer } from "./webSockets"
 import { initializeTransactionSystem } from "./controllers/transactionControllers"
+import { sseRouter } from "./routes/sseRoutes"
 const app = express()
 
 
@@ -26,6 +27,7 @@ app.use(express.json())
 app.use("/api/v1",authRouter)
 app.use("/api/v1", balanceRouter)
 app.use('/api/v1', transactionRouter)
+app.use('/api/v1/sse', sseRouter)
 
 app.use(globalErrorHandler)
 app.set("trust proxy", 1);

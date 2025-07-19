@@ -22,6 +22,7 @@ const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const balanceRoutes_1 = require("./routes/balanceRoutes");
 const transactionalRoutes_1 = __importDefault(require("./routes/transactionalRoutes"));
 const transactionControllers_1 = require("./controllers/transactionControllers");
+const sseRoutes_1 = require("./routes/sseRoutes");
 const app = (0, express_1.default)();
 const corsOptions = {
     origin: ['https://statescoinp2p.netlify.app', 'http://localhost:5173'], // Your frontend origin
@@ -34,6 +35,7 @@ app.use(express_1.default.json());
 app.use("/api/v1", authRoutes_1.authRouter);
 app.use("/api/v1", balanceRoutes_1.balanceRouter);
 app.use('/api/v1', transactionalRoutes_1.default);
+app.use('/api/v1/sse', sseRoutes_1.sseRouter);
 app.use(errorMiddleware_1.globalErrorHandler);
 app.set("trust proxy", 1);
 function startServer() {

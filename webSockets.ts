@@ -1,5 +1,4 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import { Server } from 'http';
 import { URL } from 'url';
 import { User } from "./model/userModel";
 import axios from "axios";

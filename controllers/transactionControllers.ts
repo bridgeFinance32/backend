@@ -5,6 +5,7 @@ import { Transaction } from "../model/transactionModel";
 import { User } from "../model/userModel";
 import crypto from "crypto";
 import cron, { ScheduledTask } from "node-cron";
+import { SSEService } from "../Utils/sseService";
 
 // Type Definitions
 type CurrencyCode = 'btc' | 'eth' | 'link' | 'bnb' | 'usdt' | 'usdc';
@@ -102,7 +103,7 @@ async function scheduleNextFinalization() {
     }
 
     console.log(`[Transaction] Next finalization scheduled for ${nextTransaction.reversalDeadline.toISOString()}`);
-    
+
     const date = nextTransaction.reversalDeadline;
     const cronExpression = `${date.getMinutes()} ${date.getHours()} ${date.getDate()} ${date.getMonth() + 1} *`;
 
@@ -130,11 +131,11 @@ async function processFinalization() {
     verifyDbConnection();
     console.log('[Transaction] Running finalization process');
     const result = await Transaction.finalizeExpired();
-    
+
     if (result.successCount > 0) {
       console.log(`[Transaction] Successfully finalized ${result.successCount} transactions`);
     }
-    
+
     await scheduleNextFinalization();
   } catch (error) {
     console.error('[Transaction] Error in processFinalization:', error);
@@ -147,7 +148,7 @@ export async function initializeTransactionSystem() {
   try {
     verifyDbConnection();
     console.log('[Transaction] Initializing transaction system...');
-    
+
     const result = await Transaction.finalizeExpired();
     if (result.successCount > 0) {
       console.log(`[Transaction] Processed ${result.successCount} pending finalizations on startup`);
@@ -249,6 +250,8 @@ export const createTransaction = async (req: Request, res: Response) => {
 
     // Emit event for notification
     eventBus.emit('transactionCreated', transaction);
+    await SSEService.sendBalanceUpdate(senderId);
+    await SSEService.sendBalanceUpdate(receiverId);
 
     // Schedule next finalization check
     await scheduleNextFinalization();
@@ -324,6 +327,8 @@ export const reverseTransaction = async (req: Request, res: Response) => {
 
     await session.commitTransaction();
     res.status(201).json({ status: "success", data: { transaction: reversalTx } });
+    await SSEService.sendBalanceUpdate(originalTx.receiver.toString());
+    await SSEService.sendBalanceUpdate(originalTx.sender.toString());
   } catch (error: unknown) {
     await session.abortTransaction();
     handleErrorResponse(res, error instanceof Error ? error : new Error('Unknown error'));
@@ -353,7 +358,7 @@ export const cancelTransaction = async (req: Request, res: Response) => {
 
     await sender.save({ session });
     await session.commitTransaction();
-
+    await SSEService.sendBalanceUpdate(tx.sender.toString());
     res.status(200).json({ status: "success", data: { transaction: tx } });
   } catch (error: unknown) {
     await session.abortTransaction();
@@ -367,25 +372,25 @@ export const getTransactionsByUser = async (req: Request, res: Response) => {
   try {
     verifyDbConnection();
     const userId = req.params.userId;
-    
+
     const transactions = await Transaction.find({
       $or: [
         { sender: userId },
         { receiver: userId }
       ]
     })
-    .populate("sender", "username email")
-    .populate("receiver", "username email")
-    .sort({ createdAt: -1 });
+      .populate("sender", "username email")
+      .populate("receiver", "username email")
+      .sort({ createdAt: -1 });
 
     if (!transactions || transactions.length === 0) {
       throw new TransactionNotFoundError();
     }
 
-    res.status(200).json({ 
-      status: "success", 
+    res.status(200).json({
+      status: "success",
       results: transactions.length,
-      data: { transactions } 
+      data: { transactions }
     });
   } catch (error: unknown) {
     handleErrorResponse(res, error instanceof Error ? error : new Error('Unknown error'));

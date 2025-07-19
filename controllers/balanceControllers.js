@@ -96,3 +96,4 @@ const accountController = (req, res, next) => __awaiter(void 0, void 0, void 0, 
     }
 });
 exports.accountController = accountController;
+const sseClients = new Map();

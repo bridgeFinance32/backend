@@ -20,6 +20,7 @@ const transactionModel_1 = require("../model/transactionModel");
 const userModel_1 = require("../model/userModel");
 const crypto_1 = __importDefault(require("crypto"));
 const node_cron_1 = __importDefault(require("node-cron"));
+const sseService_1 = require("../Utils/sseService");
 // Error Classes
 class InsufficientFundsError extends Error {
     constructor() {
@@ -219,6 +220,8 @@ const createTransaction = (req, res) => __awaiter(void 0, void 0, void 0, functi
         yield session.commitTransaction();
         // Emit event for notification
         eventBus_1.default.emit('transactionCreated', transaction);
+        yield sseService_1.SSEService.sendBalanceUpdate(senderId);
+        yield sseService_1.SSEService.sendBalanceUpdate(receiverId);
         // Schedule next finalization check
         yield scheduleNextFinalization();
         res.status(201).json({
@@ -287,6 +290,8 @@ const reverseTransaction = (req, res) => __awaiter(void 0, void 0, void 0, funct
         ]);
         yield session.commitTransaction();
         res.status(201).json({ status: "success", data: { transaction: reversalTx } });
+        yield sseService_1.SSEService.sendBalanceUpdate(originalTx.receiver.toString());
+        yield sseService_1.SSEService.sendBalanceUpdate(originalTx.sender.toString());
     }
     catch (error) {
         yield session.abortTransaction();
@@ -313,6 +318,7 @@ const cancelTransaction = (req, res) => __awaiter(void 0, void 0, void 0, functi
         sender.balances[currencyKey].pending -= (tx.amount + tx.fee);
         yield sender.save({ session });
         yield session.commitTransaction();
+        yield sseService_1.SSEService.sendBalanceUpdate(tx.sender.toString());
         res.status(200).json({ status: "success", data: { transaction: tx } });
     }
     catch (error) {
