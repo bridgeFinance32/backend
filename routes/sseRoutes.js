@@ -18,9 +18,8 @@ const express_1 = __importDefault(require("express"));
 const mongoose_1 = require("mongoose");
 const node_cron_1 = __importDefault(require("node-cron"));
 const sseService_1 = require("../Utils/sseService");
-const authMiddleware_1 = require("../middlewares/authMiddleware");
 exports.sseRouter = express_1.default.Router();
-exports.sseRouter.get('/balances/:id', authMiddleware_1.authenticate, (req, res) => {
+exports.sseRouter.get('/balances/:id', (req, res) => {
     const { id } = req.params;
     if (!(0, mongoose_1.isValidObjectId)(id)) {
         return res.status(400).json({

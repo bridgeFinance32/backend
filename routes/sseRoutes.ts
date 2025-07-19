@@ -8,7 +8,7 @@ import { authenticate } from '../middlewares/authMiddleware';
 
 export const sseRouter = express.Router();
 
-sseRouter.get('/balances/:id', authenticate , (req: Request, res: Response) => {
+sseRouter.get('/balances/:id' , (req: Request, res: Response) => {
     const { id } = req.params;
     
     if (!isValidObjectId(id)) {
