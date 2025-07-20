@@ -18,6 +18,7 @@ const express_1 = __importDefault(require("express"));
 const mongoose_1 = require("mongoose");
 const node_cron_1 = __importDefault(require("node-cron"));
 const sseService_1 = require("../Utils/sseService");
+const TransactionService_1 = __importDefault(require("../Utils/TransactionService"));
 exports.sseRouter = express_1.default.Router();
 exports.sseRouter.get('/balances/:id', (req, res) => {
     const { id } = req.params;
@@ -29,6 +30,21 @@ exports.sseRouter.get('/balances/:id', (req, res) => {
     }
     // No try-catch needed as SSEService handles errors
     sseService_1.SSEService.addClient(id, res);
+});
+exports.sseRouter.get('/transactions/:id', (req, res) => {
+    const { id } = req.params;
+    try {
+        if (!(0, mongoose_1.isValidObjectId)(id)) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Invalid ID format'
+            });
+        }
+        TransactionService_1.default.addClient(id, res);
+    }
+    catch (error) {
+        TransactionService_1.default.removeClient(id);
+    }
 });
 // Scheduled Price Updates
 node_cron_1.default.schedule('*/2 * * * *', () => __awaiter(void 0, void 0, void 0, function* () {

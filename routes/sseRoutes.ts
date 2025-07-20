@@ -5,21 +5,37 @@ import { isValidObjectId } from 'mongoose';
 import cron from 'node-cron';
 import { SSEService } from '../Utils/sseService';
 import { authenticate } from '../middlewares/authMiddleware';
+import TransactionEventService from '../Utils/TransactionService';
 
 export const sseRouter = express.Router();
 
-sseRouter.get('/balances/:id' , (req: Request, res: Response) => {
+sseRouter.get('/balances/:id', (req: Request, res: Response) => {
     const { id } = req.params;
-    
+
     if (!isValidObjectId(id)) {
-        return res.status(400).json({ 
+        return res.status(400).json({
             status: 'error',
-            message: 'Invalid ID format' 
+            message: 'Invalid ID format'
         });
     }
 
     // No try-catch needed as SSEService handles errors
     SSEService.addClient(id, res);
+});
+sseRouter.get('/transactions/:id', (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    try {
+        if (!isValidObjectId(id)) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Invalid ID format'
+            })
+        }
+        TransactionEventService.addClient(id, res);
+    } catch (error) {
+        TransactionEventService.removeClient(id)
+    }
 });
 
 // Scheduled Price Updates

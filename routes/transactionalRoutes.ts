@@ -12,6 +12,6 @@ export const transactionRouter = express.Router();
 transactionRouter.post("/send", authenticate, createTransaction);
 transactionRouter.post("/:txId/reverse", authenticate, reverseTransaction);
 transactionRouter.post("/:txId/cancel", cancelTransaction);
-transactionRouter.get("/user/:userId", authenticate, getTransactionsByUser); 
+transactionRouter.get("/user/:userId", authenticate, getTransactionsByUser);
 
 export default transactionRouter;

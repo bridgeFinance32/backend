@@ -20,6 +20,7 @@ const userModel_1 = require("../model/userModel");
 const crypto_1 = __importDefault(require("crypto"));
 const node_cron_1 = __importDefault(require("node-cron"));
 const sseService_1 = require("../Utils/sseService");
+const TransactionService_1 = __importDefault(require("../Utils/TransactionService"));
 // Error Classes
 class InsufficientFundsError extends Error {
     constructor() {
@@ -220,12 +221,21 @@ const createTransaction = (req, res) => __awaiter(void 0, void 0, void 0, functi
         yield sseService_1.SSEService.sendBalanceUpdate(senderId);
         yield sseService_1.SSEService.sendBalanceUpdate(receiverId);
         // Notify receiver about received transaction
-        yield sseService_1.SSEService.sendTestTransactionNotification(receiverId, 'received', {
-            amount: 10,
-            currency: 'ETH',
-            txId: "txid testing",
-            counterparty: "senders" // assuming sender has username field
-        });
+        try {
+            // Notify receiver about received funds
+            TransactionService_1.default.sendTransactionEvent(receiverId.toString(), {
+                type: 'deposit',
+                status: 'completed',
+                amount: amountNum,
+                currency,
+                txHash: transaction.blockchainTxHash,
+                fromAddress: sender.id.toString(),
+                toAddress: receiver.id.toString()
+            });
+        }
+        catch (e) {
+            console.error('Failed to send transaction events:', e);
+        }
         // Schedule next finalization check
         yield scheduleNextFinalization();
         res.status(201).json({
@@ -296,11 +306,14 @@ const reverseTransaction = (req, res) => __awaiter(void 0, void 0, void 0, funct
         res.status(201).json({ status: "success", data: { transaction: reversalTx } });
         yield sseService_1.SSEService.sendBalanceUpdate(originalTx.receiver.toString());
         yield sseService_1.SSEService.sendBalanceUpdate(originalTx.sender.toString());
-        yield sseService_1.SSEService.sendTransactionNotification(originalTx.sender.toString(), 'reversed', {
+        TransactionService_1.default.sendTransactionEvent(originalTx.receiver.toString(), {
+            type: 'withdrawal',
+            status: 'completed',
             amount: originalTx.amount,
             currency: originalTx.currency,
-            txId: reversalTx.txId,
-            counterparty: originalTx === null || originalTx === void 0 ? void 0 : originalTx.id // assuming receiver has username field
+            txHash: reversalTx.blockchainTxHash,
+            fromAddress: originalTx.receiver._id.toString(),
+            toAddress: originalTx.sender._id.toString()
         });
     }
     catch (error) {

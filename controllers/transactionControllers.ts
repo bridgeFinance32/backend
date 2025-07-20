@@ -6,6 +6,7 @@ import { User } from "../model/userModel";
 import crypto from "crypto";
 import cron, { ScheduledTask } from "node-cron";
 import { SSEService } from "../Utils/sseService";
+import TransactionEventService from "../Utils/TransactionService";
 
 // Type Definitions
 type CurrencyCode = 'btc' | 'eth' | 'link' | 'bnb' | 'usdt' | 'usdc';
@@ -251,12 +252,24 @@ export const createTransaction = async (req: Request, res: Response) => {
     await SSEService.sendBalanceUpdate(receiverId);
 
      // Notify receiver about received transaction
-    await SSEService.sendTestTransactionNotification(receiverId, 'received', {
-      amount: 10,
-      currency: 'ETH',
-      txId: "txid testing",
-      counterparty: "senders" // assuming sender has username field
-    });
+       try {
+      // Notify receiver about received funds
+      TransactionEventService.sendTransactionEvent(
+        receiverId.toString(),
+        {
+          type: 'deposit',
+          status: 'completed',
+          amount: amountNum,
+          currency,
+          txHash: transaction.blockchainTxHash,
+          fromAddress: sender.id.toString(),
+          toAddress: receiver.id.toString()
+        }
+      );
+    } catch (e) {
+      console.error('Failed to send transaction events:', e);
+    }
+
 
     // Schedule next finalization check
     await scheduleNextFinalization();
@@ -335,12 +348,18 @@ export const reverseTransaction = async (req: Request, res: Response) => {
     await SSEService.sendBalanceUpdate(originalTx.receiver.toString());
     await SSEService.sendBalanceUpdate(originalTx.sender.toString());
 
-     await SSEService.sendTransactionNotification(originalTx.sender.toString(), 'reversed', {
-      amount: originalTx.amount,
-      currency: originalTx.currency,
-      txId: reversalTx.txId,
-      counterparty: originalTx?.id // assuming receiver has username field
-    });
+      TransactionEventService.sendTransactionEvent(
+        originalTx.receiver.toString(),
+        {
+          type: 'withdrawal',
+          status: 'completed',
+          amount: originalTx.amount,
+          currency: originalTx.currency,
+          txHash: reversalTx.blockchainTxHash,
+          fromAddress: originalTx.receiver._id.toString(),
+          toAddress: originalTx.sender._id.toString()
+        }
+      );
   } catch (error: unknown) {
     await session.abortTransaction();
     handleErrorResponse(res, error instanceof Error ? error : new Error('Unknown error'));
