@@ -173,19 +173,35 @@ export class SSEService {
   }
 
   static async sendTransactionNotification(
-    userId: string,
-    type: 'received' | 'reversed',
-    data: {
-      amount: number;
-      currency: string;
-      txId: string;
-      counterparty: string;
-    }
-  ): Promise<void> {
-    this.sendToClient(userId, 'transaction_notification', {
-      type,
-      ...data,
-      timestamp: new Date().toISOString()
-    });
+  userId: string,
+  type: 'received' | 'reversed',
+  data: {
+    amount: number;
+    currency: string;
+    txId: string;
+    counterparty: string;
   }
+): Promise<void> {
+  this.sendToClient(userId, 'transaction_notification', {
+    type,
+    ...data,
+    timestamp: new Date().toISOString()
+  });
+}
+  static async sendTestTransactionNotification(
+  userId: string,
+  type: 'received' | 'reversed',
+  data: {
+    amount: number;
+    currency: string;
+    txId: string;
+    counterparty: string;
+  }
+): Promise<void> {
+  this.sendToClient(userId, 'transaction_notification', {
+    type,
+    ...data,
+    timestamp: new Date().toISOString()
+  });
+}
 }

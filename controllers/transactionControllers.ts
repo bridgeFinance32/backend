@@ -251,11 +251,11 @@ export const createTransaction = async (req: Request, res: Response) => {
     await SSEService.sendBalanceUpdate(receiverId);
 
      // Notify receiver about received transaction
-    await SSEService.sendTransactionNotification(receiverId, 'received', {
-      amount: amountNum,
-      currency,
-      txId: transaction.txId,
-      counterparty: senderId // assuming sender has username field
+    await SSEService.sendTestTransactionNotification(receiverId, 'received', {
+      amount: 10,
+      currency: 'ETH',
+      txId: "txid testing",
+      counterparty: "senders" // assuming sender has username field
     });
 
     // Schedule next finalization check

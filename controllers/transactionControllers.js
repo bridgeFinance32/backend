@@ -220,11 +220,11 @@ const createTransaction = (req, res) => __awaiter(void 0, void 0, void 0, functi
         yield sseService_1.SSEService.sendBalanceUpdate(senderId);
         yield sseService_1.SSEService.sendBalanceUpdate(receiverId);
         // Notify receiver about received transaction
-        yield sseService_1.SSEService.sendTransactionNotification(receiverId, 'received', {
-            amount: amountNum,
-            currency,
-            txId: transaction.txId,
-            counterparty: senderId // assuming sender has username field
+        yield sseService_1.SSEService.sendTestTransactionNotification(receiverId, 'received', {
+            amount: 10,
+            currency: 'ETH',
+            txId: "txid testing",
+            counterparty: "senders" // assuming sender has username field
         });
         // Schedule next finalization check
         yield scheduleNextFinalization();

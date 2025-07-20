@@ -168,6 +168,11 @@ class SSEService {
             this.sendToClient(userId, 'transaction_notification', Object.assign(Object.assign({ type }, data), { timestamp: new Date().toISOString() }));
         });
     }
+    static sendTestTransactionNotification(userId, type, data) {
+        return __awaiter(this, void 0, void 0, function* () {
+            this.sendToClient(userId, 'transaction_notification', Object.assign(Object.assign({ type }, data), { timestamp: new Date().toISOString() }));
+        });
+    }
 }
 exports.SSEService = SSEService;
 SSEService.clients = new Map();
