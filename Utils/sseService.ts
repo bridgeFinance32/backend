@@ -103,7 +103,7 @@ export class SSEService {
         `https://api.coingecko.com/api/v3/simple/price?ids=${coinIds.join(',')}&vs_currencies=usd`,
         { timeout: 5000 }
       );
-      
+
       this.cachedPrices = response.data;
       this.lastFetchTime = Date.now();
       return this.cachedPrices;
@@ -170,5 +170,22 @@ export class SSEService {
 
   static closeAll(): void {
     this.clients.forEach((_, userId) => this.removeClient(userId));
+  }
+
+  static async sendTransactionNotification(
+    userId: string,
+    type: 'received' | 'reversed',
+    data: {
+      amount: number;
+      currency: string;
+      txId: string;
+      counterparty: string;
+    }
+  ): Promise<void> {
+    this.sendToClient(userId, 'transaction_notification', {
+      type,
+      ...data,
+      timestamp: new Date().toISOString()
+    });
   }
 }

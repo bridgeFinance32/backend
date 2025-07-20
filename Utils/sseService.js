@@ -163,6 +163,11 @@ class SSEService {
     static closeAll() {
         this.clients.forEach((_, userId) => this.removeClient(userId));
     }
+    static sendTransactionNotification(userId, type, data) {
+        return __awaiter(this, void 0, void 0, function* () {
+            this.sendToClient(userId, 'transaction_notification', Object.assign(Object.assign({ type }, data), { timestamp: new Date().toISOString() }));
+        });
+    }
 }
 exports.SSEService = SSEService;
 SSEService.clients = new Map();

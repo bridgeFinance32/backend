@@ -247,11 +247,16 @@ export const createTransaction = async (req: Request, res: Response) => {
     ]);
 
     await session.commitTransaction();
-
-    // Emit event for notification
-    eventBus.emit('transactionCreated', transaction);
     await SSEService.sendBalanceUpdate(senderId);
     await SSEService.sendBalanceUpdate(receiverId);
+
+     // Notify receiver about received transaction
+    await SSEService.sendTransactionNotification(receiverId, 'received', {
+      amount: amountNum,
+      currency,
+      txId: transaction.txId,
+      counterparty: senderId // assuming sender has username field
+    });
 
     // Schedule next finalization check
     await scheduleNextFinalization();
@@ -329,6 +334,13 @@ export const reverseTransaction = async (req: Request, res: Response) => {
     res.status(201).json({ status: "success", data: { transaction: reversalTx } });
     await SSEService.sendBalanceUpdate(originalTx.receiver.toString());
     await SSEService.sendBalanceUpdate(originalTx.sender.toString());
+
+     await SSEService.sendTransactionNotification(originalTx.sender.toString(), 'reversed', {
+      amount: originalTx.amount,
+      currency: originalTx.currency,
+      txId: reversalTx.txId,
+      counterparty: originalTx?.id // assuming receiver has username field
+    });
   } catch (error: unknown) {
     await session.abortTransaction();
     handleErrorResponse(res, error instanceof Error ? error : new Error('Unknown error'));

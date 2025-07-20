@@ -14,7 +14,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getTransactionsByUser = exports.cancelTransaction = exports.reverseTransaction = exports.createTransaction = void 0;
 exports.initializeTransactionSystem = initializeTransactionSystem;
-const eventBus_1 = __importDefault(require("../Utils/eventBus"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const transactionModel_1 = require("../model/transactionModel");
 const userModel_1 = require("../model/userModel");
@@ -218,10 +217,15 @@ const createTransaction = (req, res) => __awaiter(void 0, void 0, void 0, functi
             receiver.save({ session }),
         ]);
         yield session.commitTransaction();
-        // Emit event for notification
-        eventBus_1.default.emit('transactionCreated', transaction);
         yield sseService_1.SSEService.sendBalanceUpdate(senderId);
         yield sseService_1.SSEService.sendBalanceUpdate(receiverId);
+        // Notify receiver about received transaction
+        yield sseService_1.SSEService.sendTransactionNotification(receiverId, 'received', {
+            amount: amountNum,
+            currency,
+            txId: transaction.txId,
+            counterparty: senderId // assuming sender has username field
+        });
         // Schedule next finalization check
         yield scheduleNextFinalization();
         res.status(201).json({
@@ -292,6 +296,12 @@ const reverseTransaction = (req, res) => __awaiter(void 0, void 0, void 0, funct
         res.status(201).json({ status: "success", data: { transaction: reversalTx } });
         yield sseService_1.SSEService.sendBalanceUpdate(originalTx.receiver.toString());
         yield sseService_1.SSEService.sendBalanceUpdate(originalTx.sender.toString());
+        yield sseService_1.SSEService.sendTransactionNotification(originalTx.sender.toString(), 'reversed', {
+            amount: originalTx.amount,
+            currency: originalTx.currency,
+            txId: reversalTx.txId,
+            counterparty: originalTx === null || originalTx === void 0 ? void 0 : originalTx.id // assuming receiver has username field
+        });
     }
     catch (error) {
         yield session.abortTransaction();
