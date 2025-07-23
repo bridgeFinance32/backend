@@ -265,70 +265,93 @@ const reverseTransaction = (req, res) => __awaiter(void 0, void 0, void 0, funct
         session.startTransaction();
         verifyDbConnection();
         const { txId } = req.params;
-        const originalTx = yield transactionModel_1.Transaction.findOne({ txId }).session(session);
-        // Ensure only the original sender can reverse
-        if ((originalTx === null || originalTx === void 0 ? void 0 : originalTx.sender.toString()) !== AuthReq.user.id) {
-            throw new Error("Only the original sender can reverse this transaction");
-        }
-        if (!originalTx)
+        // Find the transaction to reverse
+        const transaction = yield transactionModel_1.Transaction.findOne({ txId }).session(session);
+        if (!transaction)
             throw new TransactionNotFoundError();
-        if (originalTx.status !== "completed") {
+        // Determine the original transaction (follow reversal chain if needed)
+        let originalTx = transaction;
+        if (transaction.type === "reversal" && transaction.reversalOf) {
+            const foundOriginalTx = yield transactionModel_1.Transaction.findById(transaction.reversalOf).session(session);
+            if (!foundOriginalTx)
+                throw new TransactionNotFoundError();
+            originalTx = foundOriginalTx;
+        }
+        // Prevent reversal of a reversal transaction
+        if (transaction.type === "reversal") {
+            throw new InvalidTransactionStateError("Reversal transactions cannot be reversed");
+        }
+        // Check if transaction has already been reversed
+        if (transaction.status === "reversed") {
+            throw new InvalidTransactionStateError("Transaction has already been reversed");
+        }
+        // Verify the current user is the original sender (User A)
+        if (originalTx.sender.toString() !== AuthReq.user.id) {
+            throw new InvalidTransactionStateError("Only the original sender can reverse this transaction");
+        }
+        // Validate transaction state
+        if (transaction.status !== "completed") {
             throw new InvalidTransactionStateError("Only completed transactions can be reversed");
         }
-        if (originalTx.reversalDeadline && originalTx.reversalDeadline <= new Date()) {
+        if (transaction.reversalDeadline && transaction.reversalDeadline <= new Date()) {
             throw new ReversalWindowExpiredError();
         }
-        const currencyKey = getCurrencyKey(originalTx.currency);
-        const [sender, receiver] = yield Promise.all([
-            userModel_1.User.findById(originalTx.receiver).session(session),
-            userModel_1.User.findById(originalTx.sender).session(session)
+        const currencyKey = getCurrencyKey(transaction.currency);
+        // Get both parties (original sender becomes receiver in reversal)
+        const [currentSender, currentReceiver] = yield Promise.all([
+            userModel_1.User.findById(transaction.receiver).session(session), // Original receiver (now sender)
+            userModel_1.User.findById(transaction.sender).session(session), // Original sender (now receiver)
         ]);
-        if (!sender || !receiver)
+        if (!currentSender || !currentReceiver)
             throw new TransactionNotFoundError();
-        if (sender.balances[currencyKey].available < originalTx.amount) {
+        // Check if the original receiver has sufficient balance
+        if (currentSender.balances[currencyKey].available < transaction.amount) {
             throw new InsufficientFundsError();
         }
-        // Create reversal transaction
+        // Create reversal transaction (roles are flipped)
         const reversalTx = new transactionModel_1.Transaction({
-            sender: originalTx.receiver,
-            receiver: originalTx.sender,
-            amount: originalTx.amount,
+            sender: transaction.receiver, // Original receiver (User B)
+            receiver: transaction.sender, // Original sender (User A)
+            amount: transaction.amount,
             fee: 0,
-            currency: originalTx.currency,
+            currency: transaction.currency,
             type: "reversal",
-            reversalOf: originalTx._id,
+            reversalOf: transaction._id,
             status: "completed",
             blockchainTxHash: `0x${crypto_1.default.randomBytes(32).toString('hex')}`,
-            completedAt: new Date()
+            completedAt: new Date(),
+            reversalDeadline: null, // Prevent further reversals
         });
-        // Update balances
-        sender.balances[currencyKey].available -= originalTx.amount;
-        receiver.balances[currencyKey].available += originalTx.amount;
-        originalTx.status = "reversed";
-        originalTx.reversedAt = new Date();
+        // Update balances (reverse the original flow)
+        currentSender.balances[currencyKey].available -= transaction.amount;
+        currentReceiver.balances[currencyKey].available += transaction.amount;
+        transaction.status = "reversed";
+        transaction.reversedAt = new Date();
+        // Save all changes atomically
         yield Promise.all([
             reversalTx.save({ session }),
-            originalTx.save({ session }),
-            sender.save({ session }),
-            receiver.save({ session })
+            transaction.save({ session }),
+            currentSender.save({ session }),
+            currentReceiver.save({ session }),
         ]);
         yield session.commitTransaction();
-        res.status(201).json({ status: "success", data: { transaction: reversalTx } });
-        yield sseService_1.SSEService.sendBalanceUpdate(originalTx.receiver.toString());
-        yield sseService_1.SSEService.sendBalanceUpdate(originalTx.sender.toString());
-        TransactionService_1.default.sendTransactionEvent(originalTx.receiver.toString(), {
-            type: 'withdrawal',
-            status: 'completed',
-            amount: originalTx.amount,
-            currency: originalTx.currency,
+        // Notify both parties
+        yield sseService_1.SSEService.sendBalanceUpdate(transaction.receiver.toString());
+        yield sseService_1.SSEService.sendBalanceUpdate(transaction.sender.toString());
+        TransactionService_1.default.sendTransactionEvent(transaction.receiver.toString(), {
+            type: "withdrawal",
+            status: "completed",
+            amount: transaction.amount,
+            currency: transaction.currency,
             txHash: reversalTx.blockchainTxHash,
-            fromAddress: originalTx.receiver._id.toString(),
-            toAddress: originalTx.sender._id.toString()
+            fromAddress: transaction.receiver.toString(),
+            toAddress: transaction.sender.toString(),
         });
+        res.status(201).json({ status: "success", data: { transaction: reversalTx } });
     }
     catch (error) {
         yield session.abortTransaction();
-        handleErrorResponse(res, error instanceof Error ? error : new Error('Unknown error'));
+        handleErrorResponse(res, error instanceof Error ? error : new Error("Unknown error"));
     }
     finally {
         session.endSession();
