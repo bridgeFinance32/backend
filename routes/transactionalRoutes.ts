@@ -1,4 +1,4 @@
-import express from "express";
+import express, { RequestHandler } from "express";
 import {
   createTransaction,
   reverseTransaction,
@@ -9,9 +9,9 @@ import { authenticate } from "../middlewares/authMiddleware";
 
 export const transactionRouter = express.Router();
 
-transactionRouter.post("/send", authenticate, createTransaction);
-transactionRouter.post("/:txId/reverse", authenticate, reverseTransaction);
+transactionRouter.post("/send", authenticate as RequestHandler, createTransaction);
+transactionRouter.post("/:txId/reverse", authenticate as RequestHandler, reverseTransaction);
 transactionRouter.post("/:txId/cancel", cancelTransaction);
-transactionRouter.get("/user/:userId", authenticate, getTransactionsByUser);
+transactionRouter.get("/user/:userId", authenticate as RequestHandler, getTransactionsByUser);
 
 export default transactionRouter;

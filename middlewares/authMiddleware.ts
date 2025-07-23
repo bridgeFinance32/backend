@@ -1,8 +1,13 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
 import Config from '../config/config';
+import { IUser } from '../model/userModel';
 
-export const authenticate = (req: Request, res: Response, next: NextFunction): void => {
+interface AuthenticatedRequest extends Request {
+  user: IUser;
+}
+
+export const authenticate = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   // Try getting token from (1) Authorization header, (2) cookies (for iOS compatibility)
   let token: string | null = null;
   
@@ -26,8 +31,10 @@ export const authenticate = (req: Request, res: Response, next: NextFunction): v
   }
 
   try {
-    const decoded = jwt.verify(token, Config.ACCESS_TOKEN_SECRET);
-    (req as any).user = decoded;
+    const decoded = jwt.verify(token, Config.ACCESS_TOKEN_SECRET) as { id: string }; // Type assertion
+    
+    // Here's the critical fix - properly assign the user to the request
+    req.user = { id: decoded.id } as IUser; // Cast to IUser if needed
     
     // Add security headers for all authenticated requests
     res.setHeader('Cache-Control', 'private, no-cache');

@@ -172,6 +172,8 @@ const createTransaction = (req, res) => __awaiter(void 0, void 0, void 0, functi
         if (isNaN(amountNum)) {
             throw new InvalidTransactionStateError("Amount must be a valid number");
         }
+        if (amountNum <= 0)
+            throw new Error("Amount must be > 0");
         const currencyKey = getCurrencyKey(currency);
         // Get users with session
         const [sender, receiver] = yield Promise.all([
@@ -188,6 +190,9 @@ const createTransaction = (req, res) => __awaiter(void 0, void 0, void 0, functi
         const availableBalance = sender.balances[currencyKey].available;
         if (availableBalance < amountNum + fee) {
             throw new InsufficientFundsError();
+        }
+        if (senderId === receiverId) {
+            throw new InvalidTransactionStateError("Sender and receiver cannot be the same");
         }
         // Create transaction
         const transaction = new transactionModel_1.Transaction({
@@ -255,11 +260,16 @@ const createTransaction = (req, res) => __awaiter(void 0, void 0, void 0, functi
 exports.createTransaction = createTransaction;
 const reverseTransaction = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const session = yield mongoose_1.default.startSession();
+    const AuthReq = req;
     try {
         session.startTransaction();
         verifyDbConnection();
         const { txId } = req.params;
         const originalTx = yield transactionModel_1.Transaction.findOne({ txId }).session(session);
+        // Ensure only the original sender can reverse
+        if ((originalTx === null || originalTx === void 0 ? void 0 : originalTx.sender.toString()) !== AuthReq.user.id) {
+            throw new Error("Only the original sender can reverse this transaction");
+        }
         if (!originalTx)
             throw new TransactionNotFoundError();
         if (originalTx.status !== "completed") {

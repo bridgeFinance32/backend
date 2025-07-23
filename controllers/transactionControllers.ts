@@ -2,12 +2,14 @@ import { Request, Response } from "express";
 import eventBus from "../Utils/eventBus";
 import mongoose from "mongoose";
 import { Transaction } from "../model/transactionModel";
-import { User } from "../model/userModel";
+import { IUser, User } from "../model/userModel";
 import crypto from "crypto";
 import cron, { ScheduledTask } from "node-cron";
 import { SSEService } from "../Utils/sseService";
 import TransactionEventService from "../Utils/TransactionService";
-
+interface AuthenticatedRequest extends Request {
+  user: IUser
+}
 // Type Definitions
 type CurrencyCode = 'btc' | 'eth' | 'link' | 'bnb' | 'usdt' | 'usdc';
 
@@ -192,6 +194,8 @@ export const createTransaction = async (req: Request, res: Response) => {
       throw new InvalidTransactionStateError("Amount must be a valid number");
     }
 
+    if (amountNum <= 0) throw new Error("Amount must be > 0");
+
     const currencyKey = getCurrencyKey(currency);
 
     // Get users with session
@@ -212,6 +216,10 @@ export const createTransaction = async (req: Request, res: Response) => {
     if (availableBalance < amountNum + fee) {
       throw new InsufficientFundsError();
     }
+    if (senderId === receiverId) {
+      throw new InvalidTransactionStateError("Sender and receiver cannot be the same");
+    }
+
 
     // Create transaction
     const transaction = new Transaction({
@@ -251,8 +259,8 @@ export const createTransaction = async (req: Request, res: Response) => {
     await SSEService.sendBalanceUpdate(senderId);
     await SSEService.sendBalanceUpdate(receiverId);
 
-     // Notify receiver about received transaction
-       try {
+    // Notify receiver about received transaction
+    try {
       // Notify receiver about received funds
       TransactionEventService.sendTransactionEvent(
         receiverId.toString(),
@@ -289,13 +297,18 @@ export const createTransaction = async (req: Request, res: Response) => {
 
 export const reverseTransaction = async (req: Request, res: Response) => {
   const session = await mongoose.startSession();
-
+  const AuthReq = req as AuthenticatedRequest;
+  
   try {
     session.startTransaction();
     verifyDbConnection();
 
     const { txId } = req.params;
     const originalTx = await Transaction.findOne({ txId }).session(session);
+    // Ensure only the original sender can reverse
+    if (originalTx?.sender.toString() !== AuthReq.user.id) {
+      throw new Error("Only the original sender can reverse this transaction");
+    }
 
     if (!originalTx) throw new TransactionNotFoundError();
     if (originalTx.status !== "completed") {
@@ -348,18 +361,18 @@ export const reverseTransaction = async (req: Request, res: Response) => {
     await SSEService.sendBalanceUpdate(originalTx.receiver.toString());
     await SSEService.sendBalanceUpdate(originalTx.sender.toString());
 
-      TransactionEventService.sendTransactionEvent(
-        originalTx.receiver.toString(),
-        {
-          type: 'withdrawal',
-          status: 'completed',
-          amount: originalTx.amount,
-          currency: originalTx.currency,
-          txHash: reversalTx.blockchainTxHash,
-          fromAddress: originalTx.receiver._id.toString(),
-          toAddress: originalTx.sender._id.toString()
-        }
-      );
+    TransactionEventService.sendTransactionEvent(
+      originalTx.receiver.toString(),
+      {
+        type: 'withdrawal',
+        status: 'completed',
+        amount: originalTx.amount,
+        currency: originalTx.currency,
+        txHash: reversalTx.blockchainTxHash,
+        fromAddress: originalTx.receiver._id.toString(),
+        toAddress: originalTx.sender._id.toString()
+      }
+    );
   } catch (error: unknown) {
     await session.abortTransaction();
     handleErrorResponse(res, error instanceof Error ? error : new Error('Unknown error'));
