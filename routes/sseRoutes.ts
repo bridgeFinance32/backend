@@ -39,7 +39,7 @@ sseRouter.get('/transactions/:id', (req: Request, res: Response) => {
 });
 
 // Scheduled Price Updates
-cron.schedule('*/2 * * * *', async () => {
+cron.schedule('*/10 * * * *', async () => {
     try {
         console.log('[Cron] Updating crypto prices...');
         await SSEService.notifyAll();
