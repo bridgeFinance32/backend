@@ -176,11 +176,11 @@ process.on('SIGINT', () => {
 
 // Controller Methods
 export const createTransaction = async (req: Request, res: Response) => {
+  verifyDbConnection();
   const session = await mongoose.startSession();
 
   try {
     session.startTransaction();
-    verifyDbConnection();
 
     const { senderId, receiverId, amount, currency } = req.body;
 
@@ -296,12 +296,12 @@ export const createTransaction = async (req: Request, res: Response) => {
 };
 
 export const reverseTransaction = async (req: Request, res: Response) => {
+   verifyDbConnection();
   const session = await mongoose.startSession();
   const AuthReq = req as AuthenticatedRequest;
 
   try {
     session.startTransaction();
-    verifyDbConnection();
 
     const { txId } = req.params;
 
@@ -410,11 +410,11 @@ export const reverseTransaction = async (req: Request, res: Response) => {
 };
 
 export const cancelTransaction = async (req: Request, res: Response) => {
+  verifyDbConnection();
   const session = await mongoose.startSession();
 
   try {
     session.startTransaction();
-    verifyDbConnection();
 
     const { txId } = req.params;
     const tx = await Transaction.cancelPending(txId, session);

@@ -47,7 +47,7 @@ exports.sseRouter.get('/transactions/:id', (req, res) => {
     }
 });
 // Scheduled Price Updates
-node_cron_1.default.schedule('*/2 * * * *', () => __awaiter(void 0, void 0, void 0, function* () {
+node_cron_1.default.schedule('*/10 * * * *', () => __awaiter(void 0, void 0, void 0, function* () {
     try {
         console.log('[Cron] Updating crypto prices...');
         yield sseService_1.SSEService.notifyAll();

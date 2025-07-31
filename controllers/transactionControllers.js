@@ -159,10 +159,10 @@ process.on('SIGINT', () => {
 });
 // Controller Methods
 const createTransaction = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    verifyDbConnection();
     const session = yield mongoose_1.default.startSession();
     try {
         session.startTransaction();
-        verifyDbConnection();
         const { senderId, receiverId, amount, currency } = req.body;
         // Validate inputs
         if (!senderId || !receiverId || !amount || !currency) {
@@ -259,11 +259,11 @@ const createTransaction = (req, res) => __awaiter(void 0, void 0, void 0, functi
 });
 exports.createTransaction = createTransaction;
 const reverseTransaction = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    verifyDbConnection();
     const session = yield mongoose_1.default.startSession();
     const AuthReq = req;
     try {
         session.startTransaction();
-        verifyDbConnection();
         const { txId } = req.params;
         // Find the transaction to reverse
         const transaction = yield transactionModel_1.Transaction.findOne({ txId }).session(session);
@@ -359,10 +359,10 @@ const reverseTransaction = (req, res) => __awaiter(void 0, void 0, void 0, funct
 });
 exports.reverseTransaction = reverseTransaction;
 const cancelTransaction = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    verifyDbConnection();
     const session = yield mongoose_1.default.startSession();
     try {
         session.startTransaction();
-        verifyDbConnection();
         const { txId } = req.params;
         const tx = yield transactionModel_1.Transaction.cancelPending(txId, session);
         const sender = yield userModel_1.User.findById(tx.sender).session(session);
