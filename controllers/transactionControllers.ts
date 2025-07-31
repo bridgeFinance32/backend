@@ -7,9 +7,11 @@ import crypto from "crypto";
 import cron, { ScheduledTask } from "node-cron";
 import { SSEService } from "../Utils/sseService";
 import TransactionEventService from "../Utils/TransactionService";
+
 interface AuthenticatedRequest extends Request {
-  user: IUser
+  user: IUser;
 }
+
 // Type Definitions
 type CurrencyCode = 'btc' | 'eth' | 'link' | 'bnb' | 'usdt' | 'usdc';
 
@@ -63,6 +65,33 @@ let cronJob: ScheduledTask | null = null;
 function verifyDbConnection() {
   if (mongoose.connection.readyState !== 1) {
     throw new Error('Database not connected');
+  }
+}
+
+// Transaction session helper
+async function withTransaction<T>(
+  fn: (session: mongoose.ClientSession) => Promise<T>
+): Promise<T> {
+  const session = await mongoose.startSession();
+  let transactionCompleted = false;
+
+  try {
+    session.startTransaction();
+    const result = await fn(session);
+    await session.commitTransaction();
+    transactionCompleted = true;
+    return result;
+  } catch (error) {
+    if (!transactionCompleted) {
+      try {
+        await session.abortTransaction();
+      } catch (abortError) {
+        console.error('Error aborting transaction:', abortError);
+      }
+    }
+    throw error;
+  } finally {
+    session.endSession();
   }
 }
 
@@ -177,11 +206,8 @@ process.on('SIGINT', () => {
 // Controller Methods
 export const createTransaction = async (req: Request, res: Response) => {
   verifyDbConnection();
-  const session = await mongoose.startSession();
 
-  try {
-    session.startTransaction();
-
+  await withTransaction(async (session) => {
     const { senderId, receiverId, amount, currency } = req.body;
 
     // Validate inputs
@@ -220,7 +246,6 @@ export const createTransaction = async (req: Request, res: Response) => {
       throw new InvalidTransactionStateError("Sender and receiver cannot be the same");
     }
 
-
     // Create transaction
     const transaction = new Transaction({
       sender: senderId,
@@ -255,13 +280,11 @@ export const createTransaction = async (req: Request, res: Response) => {
       receiver.save({ session }),
     ]);
 
-    await session.commitTransaction();
     await SSEService.sendBalanceUpdate(senderId);
     await SSEService.sendBalanceUpdate(receiverId);
 
     // Notify receiver about received transaction
     try {
-      // Notify receiver about received funds
       TransactionEventService.sendTransactionEvent(
         receiverId.toString(),
         {
@@ -278,31 +301,22 @@ export const createTransaction = async (req: Request, res: Response) => {
       console.error('Failed to send transaction events:', e);
     }
 
-
-    // Schedule next finalization check
     await scheduleNextFinalization();
 
     res.status(201).json({
       status: "success",
       data: { transaction }
     });
-  } catch (error: unknown) {
-    await session.abortTransaction();
-    console.error('Transaction error:', error);
+  }).catch((error: unknown) => {
     handleErrorResponse(res, error instanceof Error ? error : new Error('Unknown error'));
-  } finally {
-    session.endSession();
-  }
+  });
 };
 
 export const reverseTransaction = async (req: Request, res: Response) => {
-   verifyDbConnection();
-  const session = await mongoose.startSession();
+  verifyDbConnection();
   const AuthReq = req as AuthenticatedRequest;
 
-  try {
-    session.startTransaction();
-
+  await withTransaction(async (session) => {
     const { txId } = req.params;
 
     // Find the transaction to reverse
@@ -384,8 +398,6 @@ export const reverseTransaction = async (req: Request, res: Response) => {
       currentReceiver.save({ session }),
     ]);
 
-    await session.commitTransaction();
-
     // Notify both parties
     await SSEService.sendBalanceUpdate(transaction.receiver.toString());
     await SSEService.sendBalanceUpdate(transaction.sender.toString());
@@ -401,21 +413,15 @@ export const reverseTransaction = async (req: Request, res: Response) => {
     });
 
     res.status(201).json({ status: "success", data: { transaction: reversalTx } });
-  } catch (error: unknown) {
-    await session.abortTransaction();
+  }).catch((error: unknown) => {
     handleErrorResponse(res, error instanceof Error ? error : new Error("Unknown error"));
-  } finally {
-    session.endSession();
-  }
+  });
 };
 
 export const cancelTransaction = async (req: Request, res: Response) => {
   verifyDbConnection();
-  const session = await mongoose.startSession();
 
-  try {
-    session.startTransaction();
-
+  await withTransaction(async (session) => {
     const { txId } = req.params;
     const tx = await Transaction.cancelPending(txId, session);
     const sender = await User.findById(tx.sender).session(session);
@@ -429,15 +435,11 @@ export const cancelTransaction = async (req: Request, res: Response) => {
     sender.balances[currencyKey].pending -= (tx.amount + tx.fee);
 
     await sender.save({ session });
-    await session.commitTransaction();
     await SSEService.sendBalanceUpdate(tx.sender.toString());
     res.status(200).json({ status: "success", data: { transaction: tx } });
-  } catch (error: unknown) {
-    await session.abortTransaction();
+  }).catch((error: unknown) => {
     handleErrorResponse(res, error instanceof Error ? error : new Error('Unknown error'));
-  } finally {
-    session.endSession();
-  }
+  });
 };
 
 export const getTransactionsByUser = async (req: Request, res: Response) => {

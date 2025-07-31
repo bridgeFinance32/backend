@@ -54,6 +54,34 @@ function verifyDbConnection() {
         throw new Error('Database not connected');
     }
 }
+// Transaction session helper
+function withTransaction(fn) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const session = yield mongoose_1.default.startSession();
+        let transactionCompleted = false;
+        try {
+            session.startTransaction();
+            const result = yield fn(session);
+            yield session.commitTransaction();
+            transactionCompleted = true;
+            return result;
+        }
+        catch (error) {
+            if (!transactionCompleted) {
+                try {
+                    yield session.abortTransaction();
+                }
+                catch (abortError) {
+                    console.error('Error aborting transaction:', abortError);
+                }
+            }
+            throw error;
+        }
+        finally {
+            session.endSession();
+        }
+    });
+}
 function scheduleNextFinalization() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -160,9 +188,7 @@ process.on('SIGINT', () => {
 // Controller Methods
 const createTransaction = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     verifyDbConnection();
-    const session = yield mongoose_1.default.startSession();
-    try {
-        session.startTransaction();
+    yield withTransaction((session) => __awaiter(void 0, void 0, void 0, function* () {
         const { senderId, receiverId, amount, currency } = req.body;
         // Validate inputs
         if (!senderId || !receiverId || !amount || !currency) {
@@ -222,12 +248,10 @@ const createTransaction = (req, res) => __awaiter(void 0, void 0, void 0, functi
             sender.save({ session }),
             receiver.save({ session }),
         ]);
-        yield session.commitTransaction();
         yield sseService_1.SSEService.sendBalanceUpdate(senderId);
         yield sseService_1.SSEService.sendBalanceUpdate(receiverId);
         // Notify receiver about received transaction
         try {
-            // Notify receiver about received funds
             TransactionService_1.default.sendTransactionEvent(receiverId.toString(), {
                 type: 'deposit',
                 status: 'completed',
@@ -241,29 +265,20 @@ const createTransaction = (req, res) => __awaiter(void 0, void 0, void 0, functi
         catch (e) {
             console.error('Failed to send transaction events:', e);
         }
-        // Schedule next finalization check
         yield scheduleNextFinalization();
         res.status(201).json({
             status: "success",
             data: { transaction }
         });
-    }
-    catch (error) {
-        yield session.abortTransaction();
-        console.error('Transaction error:', error);
+    })).catch((error) => {
         handleErrorResponse(res, error instanceof Error ? error : new Error('Unknown error'));
-    }
-    finally {
-        session.endSession();
-    }
+    });
 });
 exports.createTransaction = createTransaction;
 const reverseTransaction = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     verifyDbConnection();
-    const session = yield mongoose_1.default.startSession();
     const AuthReq = req;
-    try {
-        session.startTransaction();
+    yield withTransaction((session) => __awaiter(void 0, void 0, void 0, function* () {
         const { txId } = req.params;
         // Find the transaction to reverse
         const transaction = yield transactionModel_1.Transaction.findOne({ txId }).session(session);
@@ -334,7 +349,6 @@ const reverseTransaction = (req, res) => __awaiter(void 0, void 0, void 0, funct
             currentSender.save({ session }),
             currentReceiver.save({ session }),
         ]);
-        yield session.commitTransaction();
         // Notify both parties
         yield sseService_1.SSEService.sendBalanceUpdate(transaction.receiver.toString());
         yield sseService_1.SSEService.sendBalanceUpdate(transaction.sender.toString());
@@ -348,21 +362,14 @@ const reverseTransaction = (req, res) => __awaiter(void 0, void 0, void 0, funct
             toAddress: transaction.sender.toString(),
         });
         res.status(201).json({ status: "success", data: { transaction: reversalTx } });
-    }
-    catch (error) {
-        yield session.abortTransaction();
+    })).catch((error) => {
         handleErrorResponse(res, error instanceof Error ? error : new Error("Unknown error"));
-    }
-    finally {
-        session.endSession();
-    }
+    });
 });
 exports.reverseTransaction = reverseTransaction;
 const cancelTransaction = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     verifyDbConnection();
-    const session = yield mongoose_1.default.startSession();
-    try {
-        session.startTransaction();
+    yield withTransaction((session) => __awaiter(void 0, void 0, void 0, function* () {
         const { txId } = req.params;
         const tx = yield transactionModel_1.Transaction.cancelPending(txId, session);
         const sender = yield userModel_1.User.findById(tx.sender).session(session);
@@ -373,17 +380,11 @@ const cancelTransaction = (req, res) => __awaiter(void 0, void 0, void 0, functi
         sender.balances[currencyKey].available += (tx.amount + tx.fee);
         sender.balances[currencyKey].pending -= (tx.amount + tx.fee);
         yield sender.save({ session });
-        yield session.commitTransaction();
         yield sseService_1.SSEService.sendBalanceUpdate(tx.sender.toString());
         res.status(200).json({ status: "success", data: { transaction: tx } });
-    }
-    catch (error) {
-        yield session.abortTransaction();
+    })).catch((error) => {
         handleErrorResponse(res, error instanceof Error ? error : new Error('Unknown error'));
-    }
-    finally {
-        session.endSession();
-    }
+    });
 });
 exports.cancelTransaction = cancelTransaction;
 const getTransactionsByUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
